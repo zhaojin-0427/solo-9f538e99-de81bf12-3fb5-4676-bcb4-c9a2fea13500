@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% block title %}{{ draft.id }} · 三方合并{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>合并草稿 <code>{{ draft.id }}</code>
+    {% if draft.status == 'completed' %}
+      <span class="badge b-ok">已完成</span>
+    {% else %}
+      <span class="badge b-block">进行中</span>
+    {% endif %}
+  </h2>
+  <table class="kv">
+    <tr><td>来源表</td>
+      <td>
+        {% for s in view.sources %}
+          {{ s.role }}
+          <a href="{{ url_for('file_detail', file_id=s.id) }}"><code>{{ s.id }}</code></a>
+          {% if s.available %}<span class="badge b-ok">可用</span>
+          {% else %}<span class="badge b-rev">已不可用</span>{% endif %}
+          {% if not loop.last %}<br>{% endif %}
+        {% endfor %}
+      </td>
+    </tr>
+    <tr><td>记录号列</td><td><code>{{ draft.key_column }}</code></td></tr>
+    <tr><td>修订号</td><td>{{ draft.revision }}（保存与确认均以此为准，过期请求会被拒绝）</td></tr>
+    <tr><td>创建 / 更新</td><td class="muted">{{ draft.created_at }} / {{ draft.updated_at }}</td></tr>
+    {% if draft.status == 'completed' %}
+    <tr><td>完成时间</td><td class="muted">{{ draft.completed_at }}</td></tr>
+    {% endif %}
+  </table>
+  <p style="margin-bottom:0">
+    <a class="btn" style="background:#374151" href="{{ url_for('merge_index') }}">返回合并列表</a>
+  </p>
+</div>
+
+{% if draft.status == 'completed' %}
+<div class="card">
+  <h2>合并成品</h2>
+  {% if view.result %}
+  <table class="kv">
+    <tr><td>成品文件</td>
+      <td><a href="{{ url_for('file_detail', file_id=view.result.id) }}"><code>{{ view.result.id }}</code></a>
+        （{{ view.result.filename }}）</td></tr>
+    <tr><td>登记父项</td><td><code>{{ draft.left_id }}</code>、<code>{{ draft.right_id }}</code>（左右两表）</td></tr>
+    <tr><td>SHA-256</td><td><code style="font-size:11.5px">{{ view.result.content_sha256 }}</code></td></tr>
+  </table>
+  <p style="margin-top:14px;margin-bottom:0">
+    <a class="btn" href="{{ url_for('download', file_id=view.result.id) }}">下载成品 CSV</a>
+  </p>
+  {% else %}
+  <p class="muted">成品记录缺失，请联系管理员。</p>
+  {% endif %}
+  <p class="hint">草稿已完成，所有选择已锁定，不能再修改；重复确认将返回同一文件。</p>
+</div>
+{% else %}
+
+{% set ns = namespace(unavailable=false) %}
+{% for s in view.sources %}{% if not s.available %}{% set ns.unavailable = true %}{% endif %}{% endfor %}
+{% if ns.unavailable %}
+<div class="flash error">有来源表已不可用（被撤销或被上游阻断），当前无法确认合并；可继续保存选择，但确认会被拒绝。</div>
+{% endif %}
+
+<div class="card">
+  <h2>冲突处理（共 {{ view.total_conflicts }} 处，已解决 {{ view.resolved }} 处，剩余 {{ view.remaining }} 处）</h2>
+  {% if view.conflicts %}
+  <form method="post" id="merge-form">
+    <input type="hidden" name="revision" value="{{ draft.revision }}">
+    {% for c in view.conflicts %}
+    <div class="conflict">
+      {% if c.type == 'cell' %}
+        <div class="conflict-title">
+          <b>记录号 <code>{{ c.key }}</code> · 列 <code>{{ c.column }}</code></b>：双方同格异改
+        </div>
+        <table class="cmp">
+          <thead><tr><th>基表</th><th>左表</th><th>右表</th></tr></thead>
+          <tbody><tr>
+            <td class="{{ c.base.cls }}">{{ c.base.text }}</td>
+            <td class="{{ c.left.cls }}">{{ c.left.text }}</td>
+            <td class="{{ c.right.cls }}">{{ c.right.text }}</td>
+          </tr></tbody>
+        </table>
+        <label class="opt">
+          <input type="radio" name="choice-{{ c.index }}" value="left"
+                 {{ "checked" if c.choice == "left" }}> 采用左表
+        </label>
+        <label class="opt">
+          <input type="radio" name="choice-{{ c.index }}" value="right"
+                 {{ "checked" if c.choice == "right" }}> 采用右表
+        </label>
+      {% else %}
+        <div class="conflict-title">
+          <b>记录号 <code>{{ c.key }}</code></b>：{{ c.deleted_label }}删除了该行，{{ c.modified_label }}修改了该行（删改冲突）
+        </div>
+        <table class="cmp">
+          <thead><tr><th>列</th><th>基表</th><th>{{ c.modified_label }}（修改后）</th></tr></thead>
+          <tbody>
+            {% for r in c.rows %}
+            <tr>
+              <td><code>{{ r.column }}</code></td>
+              <td class="{{ r.base.cls }}">{{ r.base.text }}</td>
+              <td class="{{ r.modified.cls }}">{{ r.modified.text }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <label class="opt">
+          <input type="radio" name="choice-{{ c.index }}" value="keep"
+                 {{ "checked" if c.choice == "keep" }}> 保留{{ c.modified_label }}的修改行
+        </label>
+        <label class="opt">
+          <input type="radio" name="choice-{{ c.index }}" value="drop"
+                 {{ "checked" if c.choice == "drop" }}> 删除该行
+        </label>
+      {% endif %}
+    </div>
+    {% endfor %}
+    <p style="margin-top:16px">
+      <button type="submit" id="save-btn"
+              formaction="{{ url_for('merge_save', draft_id=draft.id) }}">保存选择（草稿）</button>
+      <button type="submit" id="confirm-btn"
+              formaction="{{ url_for('merge_confirm', draft_id=draft.id) }}"
+              onclick="return confirm('确认合并并登记成品？完成后草稿锁定，不能再修改。');">确认合并并登记成品</button>
+      <span class="hint" id="confirm-hint"></span>
+    </p>
+  </form>
+  <script>
+  (function () {
+    var total = {{ view.total_conflicts }};
+    var confirmBtn = document.getElementById('confirm-btn');
+    var hint = document.getElementById('confirm-hint');
+    function refresh() {
+      var picked = {};
+      document.querySelectorAll('#merge-form input[type=radio]:checked')
+        .forEach(function (el) { picked[el.name] = true; });
+      var done = Object.keys(picked).length;
+      var left = total - done;
+      confirmBtn.disabled = left > 0;
+      hint.textContent = left > 0 ? ('还有 ' + left + ' 处未选择，不能确认') : '';
+    }
+    document.getElementById('merge-form').addEventListener('change', refresh);
+    refresh();
+  })();
+  </script>
+  {% else %}
+  <p class="muted">本次合并没有需要人工处理的冲突，全部改动已按规则自动合入。</p>
+  <form method="post">
+    <input type="hidden" name="revision" value="{{ draft.revision }}">
+    <button type="submit"
+            formaction="{{ url_for('merge_confirm', draft_id=draft.id) }}"
+            onclick="return confirm('确认合并并登记成品？完成后草稿锁定，不能再修改。');">确认合并并登记成品</button>
+  </form>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>自动合入明细（保留 {{ view.auto_keep }} 行 · 删除 {{ view.auto_drop }} 行 · 共 {{ view.total_keys }} 个记录号）</h2>
+  {% if view.auto_rows %}
+  <details>
+    <summary class="muted">展开查看每一行的自动处理决定</summary>
+    <table style="margin-top:10px">
+      <thead><tr><th>记录号</th><th>处理</th><th>依据</th></tr></thead>
+      <tbody>
+        {% for r in view.auto_rows %}
+        <tr>
+          <td><code>{{ r.key }}</code></td>
+          <td>{{ r.action }}</td>
+          <td class="muted">{{ r.note }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+  {% else %}
+  <p class="muted">无自动处理行。</p>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -90,7 +90,7 @@
       <tr>
         <td class="muted">{{ e.ts }}</td>
         <td>{% if e.file_id %}<code>{{ e.file_id }}</code>{% else %}-{% endif %}</td>
-        <td>{{ "上传登记" if e.action == "upload" else "撤销" }}</td>
+        <td>{{ {'upload': '上传登记', 'revoke': '撤销', 'merge': '三方合并'}[e.action] }}</td>
         <td class="muted">{{ e.detail }}</td>
       </tr>
       {% endfor %}

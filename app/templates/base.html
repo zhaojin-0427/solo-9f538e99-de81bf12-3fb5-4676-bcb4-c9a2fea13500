@@ -50,6 +50,20 @@
   .flash.success { background:var(--greenbg); border-color:#bbf7d0; color:var(--green); }
   .flash.notice  { background:var(--amberbg); border-color:#fde68a; color:var(--amber); }
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+  .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:18px; }
+  nav.tabs { margin-top:10px; font-size:13.5px; }
+  nav.tabs a { color:#cfe3f0; margin-right:16px; }
+  nav.tabs a:hover { color:#fff; }
+  .conflict { border:1px solid var(--line); border-radius:8px; padding:12px 14px;
+              margin:12px 0; background:#fcfcfd; }
+  .conflict-title { font-size:13.5px; margin-bottom:8px; }
+  table.cmp { width:auto; min-width:55%; margin:6px 0 10px; font-size:13px; }
+  table.cmp th, table.cmp td { padding:5px 12px; border:1px solid #e5e7eb; }
+  .v-missing { color:var(--amber); font-style:italic; }
+  .v-empty { color:var(--muted); font-style:italic; }
+  label.opt { display:inline-block; font-weight:400; margin:2px 18px 2px 0;
+              font-size:13.5px; }
+  label.opt input { margin-right:4px; }
   .kv { width:100%; font-size:13.5px; }
   .kv td { border-bottom:1px solid #eef0f3; }
   .kv td:first-child { color:var(--muted); width:150px; white-space:nowrap; }
@@ -63,6 +77,10 @@
 <header>
   <h1>药品稳定性试验 · 数据文件登记与追溯平台</h1>
   <div class="sub">文件与依赖关系一经登记不可修改 · 撤销沿依赖链即时阻断下载 · 修复件以新 ID 登记</div>
+  <nav class="tabs">
+    <a href="{{ url_for('index') }}">文件登记</a>
+    <a href="{{ url_for('merge_index') }}">三方合并</a>
+  </nav>
 </header>
 <main>
   {% with messages = get_flashed_messages(with_categories=true) %}

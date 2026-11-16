@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}三方合并 · 药品稳定性试验数据登记平台{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>新建三方合并草稿</h2>
+  <p class="muted">
+    用于合并两位工程师对同一份清洗表的独立更正：选择一份<b>清洗基表</b>（共同父版本），
+    以及两份<b>仅以该基表为父项</b>的清洗表。三表列名须一致，每表至多 500 行，
+    指定的记录号列在每张表内须非空且唯一。单元格按原字符串比较，缺行与空字段视为不同。
+  </p>
+  {% if cleaned %}
+  <form method="post" action="{{ url_for('merge_create') }}">
+    <div class="grid3">
+      <div>
+        <label for="base_id">清洗基表（共同父版本）</label>
+        <select name="base_id" id="base_id" required>
+          {% for f in cleaned %}
+          <option value="{{ f.id }}">{{ f.id }} · {{ f.filename }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="left_id">左表（更正版本 A）</label>
+        <select name="left_id" id="left_id" required>
+          {% for f in cleaned %}
+          <option value="{{ f.id }}">{{ f.id }} · {{ f.filename }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="right_id">右表（更正版本 B）</label>
+        <select name="right_id" id="right_id" required>
+          {% for f in cleaned %}
+          <option value="{{ f.id }}">{{ f.id }} · {{ f.filename }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div style="max-width:320px">
+      <label for="key_column">记录号列名</label>
+      <input type="text" name="key_column" id="key_column" required
+             placeholder="例如：记录号">
+    </div>
+    <p style="margin-bottom:0;margin-top:14px">
+      <button type="submit">校验并创建草稿</button>
+    </p>
+    <div class="hint">左右两表必须均以所选基表为唯一父项，且三者当前均处于可下载状态。</div>
+  </form>
+  {% else %}
+  <p class="muted">尚无处于可下载状态的清洗表，请先在首页登记上传。</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>合并草稿（共 {{ drafts|length }} 份）</h2>
+  {% if drafts %}
+  <table>
+    <thead>
+      <tr>
+        <th>草稿 ID</th><th>基表</th><th>左表</th><th>右表</th>
+        <th>记录号列</th><th>状态</th><th>更新时间</th><th>成品</th><th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in drafts %}
+      {% set d = item.row %}
+      <tr>
+        <td><a href="{{ url_for('merge_detail', draft_id=d.id) }}"><code>{{ d.id }}</code></a></td>
+        <td><code>{{ d.base_id }}</code></td>
+        <td><code>{{ d.left_id }}</code></td>
+        <td><code>{{ d.right_id }}</code></td>
+        <td>{{ d.key_column }}</td>
+        <td>
+          {% if d.status == 'completed' %}
+            <span class="badge b-ok">已完成</span>
+          {% else %}
+            <span class="badge b-block">进行中 · 剩 {{ item.remaining }} 处冲突</span>
+          {% endif %}
+        </td>
+        <td class="muted">{{ d.updated_at }}</td>
+        <td>
+          {% if d.result_id %}
+            <a href="{{ url_for('file_detail', file_id=d.result_id) }}"><code>{{ d.result_id }}</code></a>
+          {% else %}-{% endif %}
+        </td>
+        <td>
+          <a class="btn btn-sm" href="{{ url_for('merge_detail', draft_id=d.id) }}">
+            {{ '查看结果' if d.status == 'completed' else '继续合并' }}
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">尚无合并草稿。</p>
+  {% endif %}
+</div>
+{% endblock %}

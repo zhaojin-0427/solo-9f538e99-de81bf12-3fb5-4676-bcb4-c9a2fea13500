@@ -52,8 +52,29 @@ CREATE TABLE IF NOT EXISTS audit_events (
     detail     TEXT
 );
 
+-- Three-way merge drafts.  The merge state derived from the three source
+-- CSVs is frozen into state_json at creation; user conflict choices and the
+-- optimistic-concurrency revision are updated in place until confirmation
+-- locks the draft and links the registered result file.
+CREATE TABLE IF NOT EXISTS merge_drafts (
+    id           TEXT PRIMARY KEY,
+    base_id      TEXT NOT NULL REFERENCES files(id),
+    left_id      TEXT NOT NULL REFERENCES files(id),
+    right_id     TEXT NOT NULL REFERENCES files(id),
+    key_column   TEXT NOT NULL,
+    state_json   TEXT NOT NULL,
+    choices_json TEXT NOT NULL DEFAULT '{}',
+    revision     INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
+    status       TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'completed')),
+    result_id    TEXT REFERENCES files(id),
+    created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    completed_at TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_dep_parent ON dependencies(parent_id);
 CREATE INDEX IF NOT EXISTS idx_dep_child  ON dependencies(child_id);
+CREATE INDEX IF NOT EXISTS idx_merge_drafts_status ON merge_drafts(status);
 """
 
 
@@ -97,7 +118,7 @@ def init_app(app) -> None:
 # ID generation
 # ---------------------------------------------------------------------------
 
-_PREFIX = {"raw": "RAW", "cleaned": "CLN", "summary": "SUM"}
+_PREFIX = {"raw": "RAW", "cleaned": "CLN", "summary": "SUM", "merge": "MRG"}
 
 
 def next_file_id(conn: sqlite3.Connection, kind: str) -> str:
@@ -113,6 +134,11 @@ def next_file_id(conn: sqlite3.Connection, kind: str) -> str:
     )
     value = cur.fetchone()[0] - 1
     return f"{prefix}-{value:04d}"
+
+
+def next_merge_id(conn: sqlite3.Connection) -> str:
+    """Allocate the next merge-draft ID (MRG-0001, ...)."""
+    return next_file_id(conn, "merge")
 
 
 # ---------------------------------------------------------------------------
@@ -268,3 +294,38 @@ def recent_events(conn: sqlite3.Connection, limit: int = 20) -> list[sqlite3.Row
     return conn.execute(
         "SELECT * FROM audit_events ORDER BY id DESC LIMIT ?", (limit,)
     ).fetchall()
+
+
+# ---------------------------------------------------------------------------
+# Merge drafts
+# ---------------------------------------------------------------------------
+
+def get_merge_draft(conn: sqlite3.Connection, draft_id: str) -> sqlite3.Row | None:
+    return conn.execute(
+        "SELECT * FROM merge_drafts WHERE id = ?", (draft_id,)
+    ).fetchone()
+
+
+def list_merge_drafts(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT * FROM merge_drafts ORDER BY created_at, id"
+    ).fetchall()
+
+
+def insert_merge_draft(
+    conn: sqlite3.Connection,
+    draft_id: str,
+    base_id: str,
+    left_id: str,
+    right_id: str,
+    key_column: str,
+    state_json: str,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO merge_drafts
+            (id, base_id, left_id, right_id, key_column, state_json)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (draft_id, base_id, left_id, right_id, key_column, state_json),
+    )

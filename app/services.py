@@ -25,8 +25,12 @@ class ServiceError(Exception):
 # CSV validation
 # ---------------------------------------------------------------------------
 
-def validate_csv(path: str) -> None:
-    """Reject anything that is not a well-formed, non-empty CSV file."""
+def validate_csv(path: str, allow_header_only: bool = False) -> None:
+    """Reject anything that is not a well-formed, non-empty CSV file.
+
+    ``allow_header_only`` is used for merge products: a merge that keeps no
+    rows is still a valid deliverable consisting of just the header line.
+    """
     try:
         with open(path, "r", encoding="utf-8-sig", newline="") as fh:
             text = fh.read()
@@ -52,8 +56,9 @@ def validate_csv(path: str) -> None:
     header = [cell.strip() for cell in rows[0]]
     if not any(header):
         raise ServiceError("CSV 缺少表头行")
-    if len(rows) < 2 or not any(
-        any(cell.strip() for cell in row) for row in rows[1:]
+    if not allow_header_only and (
+        len(rows) < 2
+        or not any(any(cell.strip() for cell in row) for row in rows[1:])
     ):
         raise ServiceError("CSV 只有表头，没有数据行")
     width = len(rows[0])
@@ -271,7 +276,7 @@ def sweep_working_dirs() -> None:
 
     for entry in os.listdir(staging_dir):
         path = os.path.join(staging_dir, entry)
-        if entry.startswith(".upload-"):
+        if entry.startswith((".upload-", ".merge-")):
             try:
                 os.unlink(path)
             except OSError:
