@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+  <h2>登记上传 CSV 文件</h2>
+  <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data">
+    <div class="grid2">
+      <div>
+        <label for="kind">文件类型</label>
+        <select name="kind" id="kind" required>
+          {% for k in kinds %}
+          <option value="{{ k }}">{{ kind_labels[k] }}（{{ k }}）</option>
+          {% endfor %}
+        </select>
+        <div class="hint">原始测量无父文件；清洗表、批次汇总必须填写其准确父文件 ID（多个用空格或逗号分隔）。</div>
+
+        <label for="file">CSV 文件（≤ 64MB）</label>
+        <input type="file" name="file" id="file" accept=".csv,text/csv" required>
+      </div>
+      <div>
+        <label for="parent_ids">父文件 ID</label>
+        <input type="text" name="parent_ids" id="parent_ids"
+               placeholder="例如：RAW-0001 或 CLN-0002, CLN-0003">
+        <div class="hint">
+          父项在提交时必须存在且处于可下载状态（自身及全部祖先均未撤销）。<br>
+          登记完成后文件内容与依赖关系均不可修改；数据有误请登记修复件（自动分配新 ID）。
+        </div>
+      </div>
+    </div>
+    <p style="margin-bottom:0;margin-top:16px">
+      <button type="submit">校验并登记</button>
+    </p>
+  </form>
+</div>
+
+<div class="card">
+  <h2>已登记文件（共 {{ rows|length }} 个）</h2>
+  {% if rows %}
+  <table>
+    <thead>
+      <tr>
+        <th>文件 ID</th><th>类型</th><th>原始文件名</th>
+        <th>大小 / SHA-256</th><th>登记时间</th><th>状态</th><th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in rows %}
+      {% set f = item.row %}
+      <tr>
+        <td><a href="{{ url_for('file_detail', file_id=f.id) }}"><code>{{ f.id }}</code></a></td>
+        <td>{{ kind_labels[f.kind] }}</td>
+        <td>{{ f.filename }}</td>
+        <td class="muted">{{ f.size_bytes }} B<br>
+          <code style="font-size:11px">{{ f.content_sha256[:16] }}…</code></td>
+        <td class="muted">{{ f.uploaded_at }}</td>
+        <td>
+          {% if f.revoked %}
+            <span class="badge b-rev">已撤销</span>
+          {% elif not item.available %}
+            <span class="badge b-block">依赖阻断 ← {{ item.blocked_by }}</span>
+          {% else %}
+            <span class="badge b-ok">可下载</span>
+          {% endif %}
+        </td>
+        <td style="white-space:nowrap">
+          {% if item.available %}
+            <a class="btn btn-sm" href="{{ url_for('download', file_id=f.id) }}">下载</a>
+          {% else %}
+            <span class="btn-disabled">下载停用</span>
+          {% endif %}
+          <a class="btn btn-sm" style="background:#374151"
+             href="{{ url_for('file_detail', file_id=f.id) }}">详情</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">尚无登记文件。</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>最近操作审计</h2>
+  {% if events %}
+  <table>
+    <thead><tr><th>时间</th><th>文件</th><th>动作</th><th>说明</th></tr></thead>
+    <tbody>
+      {% for e in events %}
+      <tr>
+        <td class="muted">{{ e.ts }}</td>
+        <td>{% if e.file_id %}<code>{{ e.file_id }}</code>{% else %}-{% endif %}</td>
+        <td>{{ "上传登记" if e.action == "upload" else "撤销" }}</td>
+        <td class="muted">{{ e.detail }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="muted">暂无操作记录。</p>
+  {% endif %}
+</div>
+{% endblock %}

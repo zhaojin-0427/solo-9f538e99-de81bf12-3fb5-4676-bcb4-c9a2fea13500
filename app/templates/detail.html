@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}{{ row.id }} · 文件详情{% endblock %}
+{% block content %}
+
+<div class="card">
+  <h2>文件 <code>{{ row.id }}</code>
+    {% if row.revoked %}
+      <span class="badge b-rev">已撤销</span>
+    {% elif not available %}
+      <span class="badge b-block">依赖阻断（{{ blocker }} 已撤销）</span>
+    {% else %}
+      <span class="badge b-ok">可下载</span>
+    {% endif %}
+  </h2>
+  <table class="kv">
+    <tr><td>类型</td><td>{{ kind_labels[row.kind] }}（{{ row.kind }}）</td></tr>
+    <tr><td>原始文件名</td><td>{{ row.filename }}</td></tr>
+    <tr><td>大小</td><td>{{ row.size_bytes }} 字节</td></tr>
+    <tr><td>SHA-256</td><td><code style="font-size:11.5px">{{ row.content_sha256 }}</code></td></tr>
+    <tr><td>登记时间</td><td>{{ row.uploaded_at }}</td></tr>
+    <tr><td>撤销状态</td>
+      <td>
+        {% if row.revoked %}
+          已于 {{ row.revoked_at }} 撤销<br>
+          原因：{{ row.revoke_reason }}
+        {% else %}未撤销{% endif %}
+      </td>
+    </tr>
+    {% if blocker and not row.revoked %}
+    <tr><td>阻断来源</td>
+      <td>上游 <code>{{ blocker }}</code>（{{ blocker_name }}）已撤销。<br>
+        阻断路径：<code>{{ blocker_path }}</code></td>
+    </tr>
+    {% endif %}
+  </table>
+
+  <p style="margin-top:16px">
+    {% if available %}
+      <a class="btn" href="{{ url_for('download', file_id=row.id) }}">下载文件</a>
+    {% else %}
+      <span class="btn-disabled">下载已停用</span>
+    {% endif %}
+    <a class="btn" style="background:#374151" href="{{ url_for('index') }}">返回列表</a>
+  </p>
+
+  {% if not row.revoked %}
+  <form method="post" action="{{ url_for('revoke', file_id=row.id) }}"
+        onsubmit="return confirm('确认撤销 {{ row.id }}？其全部直接/间接派生文件将立即停止下载，且不可恢复。');">
+    <label for="reason">撤销原因（质控员填写）</label>
+    <input type="text" name="reason" id="reason" required
+           placeholder="例如：原始测量 CSV 数据错误，禁止下游继续使用">
+    <p style="margin-top:10px"><button class="danger" type="submit">撤销该文件</button></p>
+  </form>
+  {% else %}
+  <p class="muted">该文件已撤销，不能再次操作；依赖它的派生文件不会自动恢复。
+     修复请以新文件重新登记，系统将分配新 ID。</p>
+  {% endif %}
+</div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>父文件（直接依赖，{{ parents|length }}）</h2>
+    {% if parents %}
+    <table>
+      <thead><tr><th>父文件 ID</th><th>类型</th><th>状态</th></tr></thead>
+      <tbody>
+        {% for p in parents %}
+        <tr>
+          <td><a href="{{ url_for('file_detail', file_id=p.id) }}"><code>{{ p.id }}</code></a></td>
+          <td>{{ kind_labels[p.kind] }}</td>
+          <td>{% if p.revoked %}<span class="badge b-rev">已撤销</span>
+              {% elif p.id in blocked_parent_ids %}<span class="badge b-block">依赖阻断</span>
+              {% else %}<span class="badge b-ok">可下载</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="muted">无父文件（原始测量）。</p>{% endif %}
+  </div>
+
+  <div class="card">
+    <h2>直接子文件（{{ children|length }}）</h2>
+    {% if children %}
+    <table>
+      <thead><tr><th>子文件 ID</th><th>类型</th><th>状态</th></tr></thead>
+      <tbody>
+        {% for c in children %}
+        <tr>
+          <td><a href="{{ url_for('file_detail', file_id=c.id) }}"><code>{{ c.id }}</code></a></td>
+          <td>{{ kind_labels[c.kind] }}</td>
+          <td>{% if c.revoked %}<span class="badge b-rev">已撤销</span>
+              {% elif c.id in blocked_child_ids %}<span class="badge b-block">依赖阻断</span>
+              {% else %}<span class="badge b-ok">可下载</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p class="muted">暂无直接派生文件。</p>{% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>撤销影响链（若撤销本文件，受影响的直接 / 间接派生文件）</h2>
+  {% if chains %}
+  <p class="muted">共 {{ affected|length }} 个派生文件，{{ chains|length }} 条依赖路径：</p>
+  {% for c in chains %}
+  <div class="chain">{{ c.path }}
+    {% if c.revoked %}<span class="badge b-rev" style="margin-left:8px">自身已撤销</span>{% endif %}
+  </div>
+  {% endfor %}
+  {% else %}
+  <p class="muted">本文件没有下游派生文件；撤销仅影响其自身下载。</p>
+  {% endif %}
+</div>
+{% endblock %}

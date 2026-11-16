@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>404 — 页面或文件不存在</h2>
+  <p class="muted">文件 ID 未登记，或链接地址有误。</p>
+  <p><a class="btn" href="{{ url_for('index') }}">返回首页</a></p>
+</div>
+{% endblock %}

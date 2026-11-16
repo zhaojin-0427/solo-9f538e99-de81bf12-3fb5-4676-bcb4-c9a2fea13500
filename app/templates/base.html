@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}药品稳定性试验数据登记平台{% endblock %}</title>
+<style>
+  :root { --line:#d7dce3; --muted:#6b7280; --red:#b91c1c; --redbg:#fef2f2;
+          --green:#166534; --greenbg:#f0fdf4; --amber:#92400e; --amberbg:#fffbeb;
+          --blue:#1e40af; --bluebg:#eff6ff; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "PingFang SC","Microsoft YaHei","Noto Sans CJK SC",
+         system-ui, sans-serif; color:#111827; background:#f4f6f9; }
+  header { background:#0f3d5c; color:#fff; padding:14px 28px; }
+  header h1 { margin:0; font-size:19px; font-weight:600; }
+  header .sub { font-size:12px; opacity:.8; margin-top:2px; }
+  main { max-width:1180px; margin:24px auto; padding:0 20px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px;
+          padding:20px 22px; margin-bottom:22px; }
+  .card h2 { margin:0 0 14px; font-size:16px; }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; }
+  th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line);
+           vertical-align:top; }
+  th { background:#f8fafc; font-weight:600; color:#374151; white-space:nowrap; }
+  code { background:#f1f3f6; padding:1px 6px; border-radius:4px; font-size:12.5px; }
+  a { color:var(--blue); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  .badge { display:inline-block; padding:2px 9px; border-radius:999px;
+           font-size:12px; font-weight:600; white-space:nowrap; }
+  .b-ok    { background:var(--greenbg); color:var(--green); }
+  .b-rev   { background:var(--redbg); color:var(--red); }
+  .b-block { background:var(--amberbg); color:var(--amber); }
+  .muted { color:var(--muted); font-size:12.5px; }
+  form.inline { display:inline; }
+  input[type=text], select, input[type=file] {
+    width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:7px;
+    font-size:13.5px; font-family:inherit; }
+  label { display:block; font-size:13px; font-weight:600; margin:12px 0 5px; }
+  .hint { font-size:12px; color:var(--muted); margin-top:4px; }
+  button, .btn { background:#0f3d5c; color:#fff; border:0; border-radius:7px;
+    padding:8px 18px; font-size:13.5px; cursor:pointer; font-family:inherit; }
+  button.danger { background:var(--red); }
+  button:disabled { background:#9ca3af; cursor:not-allowed; }
+  .btn-sm { padding:4px 12px; font-size:12.5px; }
+  .btn-disabled { background:#9ca3af; color:#fff; pointer-events:none;
+    display:inline-block; border-radius:7px; padding:4px 12px; font-size:12.5px; }
+  .flash { padding:11px 16px; border-radius:8px; margin-bottom:16px; font-size:13.5px;
+           border:1px solid; }
+  .flash.error   { background:var(--redbg); border-color:#fecaca; color:var(--red); }
+  .flash.success { background:var(--greenbg); border-color:#bbf7d0; color:var(--green); }
+  .flash.notice  { background:var(--amberbg); border-color:#fde68a; color:var(--amber); }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+  .kv { width:100%; font-size:13.5px; }
+  .kv td { border-bottom:1px solid #eef0f3; }
+  .kv td:first-child { color:var(--muted); width:150px; white-space:nowrap; }
+  .chain { font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px;
+           background:#f8fafc; border:1px solid var(--line); border-radius:6px;
+           padding:7px 10px; margin:6px 0; overflow-x:auto; }
+  @media (max-width:860px){ .grid2{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<header>
+  <h1>药品稳定性试验 · 数据文件登记与追溯平台</h1>
+  <div class="sub">文件与依赖关系一经登记不可修改 · 撤销沿依赖链即时阻断下载 · 修复件以新 ID 登记</div>
+</header>
+<main>
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>
